@@ -30,15 +30,20 @@ def _load_model():
     try:
         from huggingface_hub import hf_hub_download
         import joblib
+        import socket
+        # 10-second timeout — if HuggingFace is slow, use physics fallback immediately
+        socket.setdefaulttimeout(10)
         model_path   = hf_hub_download(HF_REPO, 'model/xgb_model.joblib')
         imputer_path = hf_hub_download(HF_REPO, 'model/imputer.joblib')
         le_path      = hf_hub_download(HF_REPO, 'model/label_encoder.joblib')
+        socket.setdefaulttimeout(None)
         _MODEL   = joblib.load(model_path)
         _IMPUTER = joblib.load(imputer_path)
         _LE      = joblib.load(le_path)
         return True
     except Exception as e:
         print(f'[GlobalWellFM] Model load failed: {e}  — using physics fallback')
+        socket.setdefaulttimeout(None)
         return False
 
 

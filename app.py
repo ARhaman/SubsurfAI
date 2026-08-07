@@ -22,24 +22,31 @@ from petromind.demo_wells import DEMO_WELLS, get_las_path, well_map_data, COUNTR
 from petromind.claude_chat import ask_claude
 from petromind.anomaly_detector import detect_anomalies, anomaly_summary, SEVERITY
 
-# ── Cache heavy models so they load once per server process ──────────────────
-@st.cache_resource(show_spinner="Loading GlobalWellFM model…")
-def _load_gwfm():
-    from petromind.globalwellfm import predict as _p, model_status as _ms
-    # Warm up the model by calling model_status (triggers HF download once)
-    _ms()
-    return _p, _ms
-
-@st.cache_resource(show_spinner="Loading curve prediction models…")
-def _load_curve_models():
-    from petromind.curve_predictor import detect_missing as _dm, predict_missing as _pm, apply_predictions as _ap, prediction_summary as _ps
-    return _dm, _pm, _ap, _ps
-
-_gwfm_predict, model_status = _load_gwfm()
-detect_missing, predict_missing, apply_predictions, prediction_summary = _load_curve_models()
-
+# ── Lazy model imports — loaded only when first well is analysed ──────────────
+# Nothing heavy runs at page load; landing page appears instantly.
 def gwfm_predict(df):
-    return _gwfm_predict(df)
+    from petromind.globalwellfm import predict as _p
+    return _p(df)
+
+def model_status():
+    from petromind.globalwellfm import model_status as _ms
+    return _ms()
+
+def detect_missing(df):
+    from petromind.curve_predictor import detect_missing as _f
+    return _f(df)
+
+def predict_missing(df):
+    from petromind.curve_predictor import predict_missing as _f
+    return _f(df)
+
+def apply_predictions(df, preds):
+    from petromind.curve_predictor import apply_predictions as _f
+    return _f(df, preds)
+
+def prediction_summary(preds, status):
+    from petromind.curve_predictor import prediction_summary as _f
+    return _f(preds, status)
 
 # API key: Streamlit Cloud secrets → env var → empty
 try:
@@ -105,12 +112,15 @@ with st.sidebar:
     st.markdown("## 🌍 SubsurfAI")
     st.markdown("*Global physics-aware well log platform*")
 
-    # GlobalWellFM status
-    ms = model_status()
-    if ms["loaded"]:
-        st.success(f"🤗 GlobalWellFM · F1={ms['f1']}")
+    # GlobalWellFM status — only query after a well is loaded (avoids cold HF call on landing)
+    if st.session_state.wells:
+        ms = model_status()
+        if ms["loaded"]:
+            st.success(f"🤗 GlobalWellFM · F1={ms['f1']}")
+        else:
+            st.info("⚙️ Physics interpretation active")
     else:
-        st.info("⚙️ Physics interpretation active")
+        st.info("⚙️ GlobalWellFM ready")
     st.divider()
 
     # ── Demo wells grouped by country ──

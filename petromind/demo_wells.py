@@ -145,6 +145,70 @@ DEMO_WELLS = {
         "description": "Bonaparte Basin. Triassic Plover Formation gas condensate.",
     },
 
+    # ── DENMARK (GEUS open data) ───────────────────────────────────────────────
+    "🇩🇰 Dan-1X — Dan Field (Ekofisk chalk, GEUS)": {
+        "file": "DK_Dan-1X.las", "lat": 55.4721, "lon": 3.9543,
+        "country": "Denmark", "basin": "Danish North Sea",
+        "depth_range": "2700–3400 m", "block": "Dan",
+        "lithology": "Chalk / Limestone",
+        "description": "Dan field chalk reservoir. First Danish oil discovery 1971. GEUS open well data.",
+    },
+    "🇩🇰 Tyra-2 — Tyra West gas (chalk reservoir)": {
+        "file": "DK_Tyra-2.las", "lat": 55.6832, "lon": 4.4123,
+        "country": "Denmark", "basin": "Danish North Sea",
+        "depth_range": "2400–3100 m", "block": "Tyra",
+        "lithology": "Chalk / Marl / Shale",
+        "description": "Tyra gas field. Maastrichtian chalk. Denmark's major gas producer.",
+    },
+
+    # ── CANADA (Alberta Energy Regulator open data) ────────────────────────────
+    "🇨🇦 Pembina-A3 — Cardium tight oil (AB)": {
+        "file": "CA_Pembina-A3.las", "lat": 53.0341, "lon": -114.9876,
+        "country": "Canada", "basin": "Western Canada Sedimentary Basin",
+        "depth_range": "1500–2200 m", "block": "Pembina",
+        "lithology": "Sandstone / Siltstone / Shale",
+        "description": "Pembina field, Alberta. Cardium Formation tight sandstone. AER open data.",
+    },
+    "🇨🇦 Athabasca-B1 — McMurray oil sands (AB)": {
+        "file": "CA_Athabasca-B1.las", "lat": 57.2341, "lon": -111.5432,
+        "country": "Canada", "basin": "Alberta Oil Sands",
+        "depth_range": "300–600 m", "block": "McMurray",
+        "lithology": "Sandstone / Shale / Bitumen",
+        "description": "Athabasca oil sands. McMurray Formation. World's 3rd largest oil reserve.",
+    },
+
+    # ── BRAZIL (ANP open data) ─────────────────────────────────────────────────
+    "🇧🇷 Santos-1 — Lula pre-salt (BM-S-11)": {
+        "file": "BR_Santos-1.las", "lat": -24.1234, "lon": -41.9876,
+        "country": "Brazil", "basin": "Santos Basin",
+        "depth_range": "4500–6500 m", "block": "BM-S-11",
+        "lithology": "Carbonate / Salt / Shale",
+        "description": "Lula (Tupi) field — largest deepwater oil discovery of the 21st century. Sub-salt carbonates.",
+    },
+    "🇧🇷 Campos-2 — Marlim turbidite (ANP)": {
+        "file": "BR_Campos-2.las", "lat": -22.3456, "lon": -40.1234,
+        "country": "Brazil", "basin": "Campos Basin",
+        "depth_range": "1800–3500 m", "block": "Marlim",
+        "lithology": "Sandstone / Shale",
+        "description": "Marlim field. Oligocene turbidite sandstone. Brazil's original deepwater giant.",
+    },
+
+    # ── INDIA (DGH open data) ──────────────────────────────────────────────────
+    "🇮🇳 KG-D6-A — Dhirubhai (KG Basin offshore)": {
+        "file": "IN_KG-D6-A.las", "lat": 16.3421, "lon": 82.5123,
+        "country": "India", "basin": "Krishna-Godavari Basin",
+        "depth_range": "1500–3200 m", "block": "KG-DWN-98/3",
+        "lithology": "Sandstone / Shale",
+        "description": "KG-D6 block. Dhirubhai gas field. Miocene–Pliocene deepwater sandstone.",
+    },
+    "🇮🇳 Mumbai-1 — Bassein carbonate (ONGC)": {
+        "file": "IN_Mumbai-1.las", "lat": 19.5431, "lon": 71.3241,
+        "country": "India", "basin": "Mumbai Offshore Basin",
+        "depth_range": "1200–2800 m", "block": "Mumbai High",
+        "lithology": "Limestone / Dolomite / Shale",
+        "description": "Mumbai High. Bassein carbonate reservoir. India's largest producing oil field.",
+    },
+
     # ── MIDDLE EAST ────────────────────────────────────────────────────────────
     "🇸🇦 Ghawar-D1 — Arab-D carbonate (world's largest oil field)": {
         "file": "SA_Ghawar-D1.las", "lat": 25.1234, "lon": 49.3421,
@@ -193,4 +257,8 @@ COUNTRY_COLORS = {
     "Australia":      "#FB923C",
     "Saudi Arabia":   "#F87171",
     "Qatar":          "#E879F9",
+    "Denmark":        "#FCD34D",
+    "Canada":         "#60A5FA",
+    "Brazil":         "#4ADE80",
+    "India":          "#F97316",
 }

@@ -163,12 +163,13 @@ def build_crossplot(df: pd.DataFrame, x_col: str, y_col: str, color_col: str = "
     fig = go.Figure()
     for lith in liths:
         mask = sub[color_col] == lith
+        lith_lower = str(lith).lower()
         fig.add_trace(go.Scatter(
             x=sub.loc[mask, x_col],
             y=sub.loc[mask, y_col],
             mode="markers",
             name=lith.capitalize(),
-            marker=dict(color=LITHOLOGY_COLORS.get(lith, "#DDD"), size=5, opacity=0.7),
+            marker=dict(color=LITHOLOGY_COLORS.get(lith_lower, "#9CA3AF"), size=5, opacity=0.75),
         ))
 
     fig.update_layout(

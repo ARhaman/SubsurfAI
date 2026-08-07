@@ -98,7 +98,7 @@ with st.sidebar:
 
     # ── Demo wells grouped by country ──
     st.markdown("### 🗄️ Global Demo Wells")
-    st.caption("20 wells · 7 countries · 6 basins")
+    st.caption("28 wells · 11 countries · 10 basins")
 
     # Group by country
     from collections import defaultdict
@@ -177,24 +177,21 @@ with st.sidebar:
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 st.title("🌍 SubsurfAI — Global Subsurface AI Platform")
-st.caption("GlobalWellFM · Physics-constrained interpretation · Uncertainty quantification · 7 countries")
+st.caption("GlobalWellFM · Physics-constrained interpretation · Uncertainty quantification · 11 countries")
 
 df = active_df()
 
 if df is None:
     # ── Landing page ─────────────────────────────────────────────────────────
-    st.title("🌍 SubsurfAI — Global Subsurface AI Platform")
-    st.caption("Physics-constrained well log interpretation · GlobalWellFM AI · 20 wells · 7 countries")
-
     c1, c2, c3, c4 = st.columns(4)
-    c1.markdown("#### 🗺️ World Map\nExplore 20 demo wells from Netherlands, Norway, USA, UK, Australia & Middle East.")
+    c1.markdown("#### 🗺️ World Map\nExplore 28 demo wells from 11 countries: Netherlands, Norway, USA, UK, Australia, Denmark, Canada, Brazil, India & Middle East.")
     c2.markdown("#### 📈 Log Viewer\nGR, RHOB, NPHI, RT, φ, Sw — multi-track display with uncertainty ribbons.")
     c3.markdown("#### 🤗 GlobalWellFM AI\nF1=0.9494 lithofacies model trained on 163,000 samples across 3 countries.")
     c4.markdown("#### 💬 AI Chat\nAsk about porosity, fluid contacts, reservoir quality in plain English.")
     st.info("👈 Select a country and well, or upload your own LAS file from any basin worldwide.")
 
     st.markdown("---")
-    st.markdown("### 🗺️ Global Demo Wells — 7 Countries · 6 Basins")
+    st.markdown("### 🗺️ Global Demo Wells — 11 Countries · 10 Basins")
 
     import plotly.graph_objects as go
     _map_data = well_map_data()
@@ -230,13 +227,14 @@ if df is None:
 
     # Country stats
     st.markdown("### 📊 Coverage")
-    cols = st.columns(7)
+    cols = st.columns(6)
     flags = {"Netherlands":"🇳🇱","Norway":"🇳🇴","USA":"🇺🇸","UK":"🇬🇧",
-             "Australia":"🇦🇺","Saudi Arabia":"🇸🇦","Qatar":"🇶🇦"}
+             "Australia":"🇦🇺","Saudi Arabia":"🇸🇦","Qatar":"🇶🇦",
+             "Denmark":"🇩🇰","Canada":"🇨🇦","Brazil":"🇧🇷","India":"🇮🇳"}
     from collections import Counter
     country_counts = Counter(w["country"] for w in _map_data)
     for i, (country, cnt) in enumerate(sorted(country_counts.items())):
-        cols[i % 7].metric(f"{flags.get(country,'')} {country}", f"{cnt} well{'s' if cnt>1 else ''}")
+        cols[i % 6].metric(f"{flags.get(country,'')} {country}", f"{cnt} well{'s' if cnt>1 else ''}")
 
     st.stop()
 
@@ -263,50 +261,62 @@ tab_map, tab_log, tab_xplot, tab_multi, tab_zone, tab_predict, tab_anomaly, tab_
 ])
 
 # ═══════════════════════════════════════════════════════════
-# TAB 1 — NORTH SEA MAP
+# TAB 1 — GLOBAL WELL MAP
 # ═══════════════════════════════════════════════════════════
 with tab_map:
     import plotly.graph_objects as go
-    map_data = well_map_data()
-
-    # Highlight loaded wells
+    _map_data = well_map_data()
     loaded_names = set(st.session_state.wells.keys())
 
     fig_map = go.Figure()
-    # All demo wells
-    fig_map.add_trace(go.Scattermapbox(
-        lat=[w["lat"] for w in map_data],
-        lon=[w["lon"] for w in map_data],
-        mode="markers+text",
-        name="Demo wells (NLOG)",
-        text=[w["name"] for w in map_data],
-        textposition="top center",
-        marker=dict(size=16, color=["#22C55E" if w["name"] in loaded_names else "#38BDF8" for w in map_data], opacity=0.9),
-        customdata=[[w["depth_range"], w["valid_rows"], w["description"], w["nlog_url"]] for w in map_data],
-        hovertemplate="<b>%{text}</b><br>Depth: %{customdata[0]}<br>Samples: %{customdata[1]}<br>%{customdata[2]}<extra></extra>",
-    ))
+    for country, color in COUNTRY_COLORS.items():
+        wells_c = [w for w in _map_data if w["country"] == country]
+        if not wells_c:
+            continue
+        fig_map.add_trace(go.Scattermapbox(
+            lat=[w["lat"] for w in wells_c],
+            lon=[w["lon"] for w in wells_c],
+            mode="markers",
+            name=country,
+            marker=dict(
+                size=[20 if w["name"] in loaded_names else 14 for w in wells_c],
+                color=[("#22C55E" if w["name"] in loaded_names else color) for w in wells_c],
+                opacity=0.92,
+            ),
+            customdata=[[w["name"], w["basin"], w["depth_range"], w["lithology"], w["description"]] for w in wells_c],
+            hovertemplate=(
+                "<b>%{customdata[0]}</b><br>"
+                "Basin: %{customdata[1]}<br>"
+                "Depth: %{customdata[2]}<br>"
+                "Lithology: %{customdata[3]}<br>"
+                "%{customdata[4]}<extra></extra>"
+            ),
+        ))
 
     fig_map.update_layout(
-        mapbox=dict(style="open-street-map", center=dict(lat=54.92, lon=4.85), zoom=6.5),
-        margin=dict(l=0,r=0,t=30,b=0),
-        height=500,
-        title="Dutch North Sea F-Block Wells (NLOG) — green = loaded",
+        mapbox=dict(style="open-street-map", center=dict(lat=30, lon=15), zoom=1.2),
+        margin=dict(l=0, r=0, t=0, b=0),
+        height=520,
+        legend=dict(bgcolor="rgba(15,23,42,0.8)", font=dict(color="white"), x=0.01, y=0.99),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
     )
     st.plotly_chart(fig_map, use_container_width=True)
+    st.caption("🟢 Green = currently loaded well · Select a country + well in the sidebar to load")
 
     # Well info cards
     st.markdown("#### Well Details")
     cols = st.columns(3)
-    for i, w in enumerate(map_data):
+    for i, w in enumerate(_map_data):
         with cols[i % 3]:
             loaded = w["name"] in loaded_names
-            st.markdown(f"""
-**{'✅ ' if loaded else ''}{"🟦"} {w['name']}**  
-📍 {w['lat']:.3f}°N, {w['lon']:.3f}°E · Block {w['block']}  
-📏 {w['depth_range']} · {w['valid_rows']:,} samples  
-{w['description']}  
-[📂 View on NLOG ↗]({w['nlog_url']})
-""")
+            st.markdown(
+                f"**{'✅ ' if loaded else ''}🌐 {w['name']}**  \n"
+                f"📍 {w['lat']:.3f}°, {w['lon']:.3f}° · {w['country']}  \n"
+                f"🏔 {w['basin']} · {w['depth_range']}  \n"
+                f"⛏ {w.get('lithology','')}  \n"
+                f"{w['description']}"
+            )
 
 # ═══════════════════════════════════════════════════════════
 # TAB 2 — LOG VIEW

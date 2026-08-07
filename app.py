@@ -20,9 +20,26 @@ except ImportError:
 from petromind import load_las, generate_demo_las, interpret, zone_summary, answer_question, build_log_figure, build_crossplot
 from petromind.demo_wells import DEMO_WELLS, get_las_path, well_map_data, COUNTRY_COLORS
 from petromind.claude_chat import ask_claude
-from petromind.globalwellfm import predict as gwfm_predict, model_status
-from petromind.curve_predictor import detect_missing, predict_missing, apply_predictions, prediction_summary
 from petromind.anomaly_detector import detect_anomalies, anomaly_summary, SEVERITY
+
+# ── Cache heavy models so they load once per server process ──────────────────
+@st.cache_resource(show_spinner="Loading GlobalWellFM model…")
+def _load_gwfm():
+    from petromind.globalwellfm import predict as _p, model_status as _ms
+    # Warm up the model by calling model_status (triggers HF download once)
+    _ms()
+    return _p, _ms
+
+@st.cache_resource(show_spinner="Loading curve prediction models…")
+def _load_curve_models():
+    from petromind.curve_predictor import detect_missing as _dm, predict_missing as _pm, apply_predictions as _ap, prediction_summary as _ps
+    return _dm, _pm, _ap, _ps
+
+_gwfm_predict, model_status = _load_gwfm()
+detect_missing, predict_missing, apply_predictions, prediction_summary = _load_curve_models()
+
+def gwfm_predict(df):
+    return _gwfm_predict(df)
 
 # API key: Streamlit Cloud secrets → env var → empty
 try:
@@ -106,13 +123,16 @@ with st.sidebar:
     for wname, winfo in DEMO_WELLS.items():
         by_country[winfo["country"]].append(wname)
 
-    country_choice = st.selectbox("Country", ["— all countries —"] + sorted(by_country.keys()), label_visibility="collapsed")
+    country_choice = st.selectbox("Country", ["— all countries —"] + sorted(by_country.keys()),
+                                  key="country_select", label_visibility="collapsed")
     if country_choice == "— all countries —":
         well_list = list(DEMO_WELLS.keys())
     else:
         well_list = by_country[country_choice]
 
-    demo_choice = st.selectbox("Well", ["— pick a well —"] + well_list, label_visibility="collapsed")
+    # key changes with country → Streamlit resets the dropdown automatically
+    demo_choice = st.selectbox("Well", ["— pick a well —"] + well_list,
+                               key=f"well_select_{country_choice}", label_visibility="collapsed")
 
     if st.button("▶ Load Demo Well", use_container_width=True) and demo_choice != "— pick a well —":
         with st.spinner(f"Loading & interpreting…"):

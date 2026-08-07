@@ -19,34 +19,29 @@ except ImportError:
 
 from petromind import load_las, generate_demo_las, interpret, zone_summary, answer_question, build_log_figure, build_crossplot
 from petromind.demo_wells import DEMO_WELLS, get_las_path, well_map_data, COUNTRY_COLORS
-from petromind.claude_chat import ask_claude
 from petromind.anomaly_detector import detect_anomalies, anomaly_summary, SEVERITY
 
-# ── Lazy model imports — loaded only when first well is analysed ──────────────
-# Nothing heavy runs at page load; landing page appears instantly.
-def gwfm_predict(df):
-    from petromind.globalwellfm import predict as _p
-    return _p(df)
+# ── AI modules — imported with fallback so a missing package never crashes app ─
+try:
+    from petromind.claude_chat import ask_claude
+except Exception:
+    def ask_claude(question, df, well_name, chat_history, api_key):
+        return "AI Chat unavailable — check ANTHROPIC_API_KEY in Streamlit secrets."
 
-def model_status():
-    from petromind.globalwellfm import model_status as _ms
-    return _ms()
+try:
+    from petromind.globalwellfm import predict as gwfm_predict, model_status
+except Exception:
+    def gwfm_predict(df): return None, None, "unavailable"
+    def model_status(): return {"loaded": False, "f1": None, "name": "unavailable", "classes": [], "source": ""}
 
-def detect_missing(df):
-    from petromind.curve_predictor import detect_missing as _f
-    return _f(df)
-
-def predict_missing(df):
-    from petromind.curve_predictor import predict_missing as _f
-    return _f(df)
-
-def apply_predictions(df, preds):
-    from petromind.curve_predictor import apply_predictions as _f
-    return _f(df, preds)
-
-def prediction_summary(preds, status):
-    from petromind.curve_predictor import prediction_summary as _f
-    return _f(preds, status)
+try:
+    from petromind.curve_predictor import (detect_missing, predict_missing,
+                                            apply_predictions, prediction_summary)
+except Exception:
+    def detect_missing(df): return {}
+    def predict_missing(df): return {}
+    def apply_predictions(df, p): return df
+    def prediction_summary(p, s): return "Curve prediction unavailable."
 
 # API key: Streamlit Cloud secrets → env var → empty
 try:

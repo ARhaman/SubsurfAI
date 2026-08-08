@@ -818,13 +818,60 @@ with tab_predict:
 
     status = detect_missing(df)
 
-    # Curve status table
-    col_s, col_r = st.columns([1, 2])
-    with col_s:
-        st.markdown("**Curve Status**")
+    # ── Completeness heatmap — all loaded wells × key curves ──────────────────
+    import plotly.express as px
+    KEY_CURVES = ["GR", "RHOB", "NPHI", "RT", "DT", "CALI", "SW", "PHI_EFF", "VCL"]
+    well_list_h  = list(st.session_state.wells.keys())
+    heat_z, heat_text = [], []
+    for wname in well_list_h:
+        wdf_h = st.session_state.wells[wname]["df"]
+        row_z, row_t = [], []
+        for c in KEY_CURVES:
+            if c not in wdf_h.columns:
+                pct = 0.0
+            else:
+                pct = round(wdf_h[c].notna().mean() * 100, 1)
+            row_z.append(pct)
+            row_t.append(f"{pct:.0f}%")
+        heat_z.append(row_z)
+        heat_text.append(row_t)
+
+    fig_heat = go.Figure(go.Heatmap(
+        z=heat_z,
+        x=KEY_CURVES,
+        y=[w[:22] for w in well_list_h],
+        colorscale="RdYlGn",
+        zmin=0, zmax=100,
+        xgap=2, ygap=2,
+        text=heat_text,
+        texttemplate="%{text}",
+        textfont={"size": 10, "family": "monospace"},
+        hovertemplate=(
+            "<b>Well:</b> %{y}<br>"
+            "<b>Curve:</b> %{x}<br>"
+            "<b>Completeness:</b> %{z:.1f}%<extra></extra>"
+        ),
+        colorbar=dict(title="Complete %", len=0.6),
+    ))
+    fig_heat.update_layout(
+        height=max(180, 45 * len(well_list_h) + 80),
+        margin=dict(l=10, r=10, t=35, b=10),
+        title_text="Curve Completeness — all loaded wells",
+        xaxis_title="Curve", yaxis_title="Well",
+        font=dict(family="monospace"),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+    )
+    st.plotly_chart(fig_heat, use_container_width=True)
+    st.caption("🟢 Green = 100% present · 🔴 Red = missing · AI can predict missing curves below")
+
+    # ── Prediction for active well ─────────────────────────────────────────────
+    col_r, col_act = st.columns([2, 1])
+    with col_act:
+        st.markdown(f"**Active well:** `{st.session_state.active_well}`")
         status_icons = {'ok':'✅','partial':'🟡','sparse':'🟠','missing':'❌'}
-        for curve, stat in status.items():
-            st.markdown(f"{status_icons.get(stat,'❓')} **{curve}** — {stat}")
+        for c, s in status.items():
+            st.markdown(f"{status_icons.get(s,'❓')} **{c}** — {s}")
 
     with col_r:
         predictions = predict_missing(df)

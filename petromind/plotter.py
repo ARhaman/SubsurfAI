@@ -156,26 +156,71 @@ def build_log_figure(df: pd.DataFrame, depth_range=None) -> go.Figure:
 
 
 def build_crossplot(df: pd.DataFrame, x_col: str, y_col: str, color_col: str = "LITHOLOGY") -> go.Figure:
-    """Scatter crossplot coloured by lithology."""
+    """Scatter crossplot coloured by lithology.
+    Auto-switches to density contour when > 2000 points to fix overplotting.
+    """
     sub = df[[x_col, y_col, color_col]].dropna()
     liths = sub[color_col].unique()
+    n_pts = len(sub)
 
     fig = go.Figure()
-    for lith in liths:
-        mask = sub[color_col] == lith
-        lith_lower = str(lith).lower()
-        fig.add_trace(go.Scatter(
-            x=sub.loc[mask, x_col],
-            y=sub.loc[mask, y_col],
-            mode="markers",
-            name=lith.capitalize(),
-            marker=dict(color=LITHOLOGY_COLORS.get(lith_lower, "#9CA3AF"), size=5, opacity=0.75),
-        ))
+
+    if n_pts > 2000:
+        # ── Density mode: one contour layer per lithology ────────────────────
+        for lith in liths:
+            mask = sub[color_col] == lith
+            lith_lower = str(lith).lower()
+            col = LITHOLOGY_COLORS.get(lith_lower, "#9CA3AF")
+            s = sub.loc[mask]
+            if len(s) < 10:
+                continue
+            fig.add_trace(go.Histogram2dContour(
+                x=s[x_col], y=s[y_col],
+                name=lith.capitalize(),
+                colorscale=[[0, "rgba(0,0,0,0)"], [1, col]],
+                showscale=False,
+                ncontours=8,
+                contours=dict(coloring="fill", showlines=True),
+                opacity=0.75,
+                hovertemplate=(
+                    f"<b>{lith}</b><br>"
+                    f"{x_col}: %{{x:.3f}}<br>"
+                    f"{y_col}: %{{y:.3f}}<extra></extra>"
+                ),
+            ))
+            # Sparse scatter overlay so legend markers show colour
+            sample = s.sample(min(120, len(s)), random_state=0)
+            fig.add_trace(go.Scatter(
+                x=sample[x_col], y=sample[y_col],
+                mode="markers",
+                name=lith.capitalize(),
+                showlegend=False,
+                marker=dict(color=col, size=3, opacity=0.4),
+            ))
+        fig.add_annotation(
+            text=f"⚠ Density view — {n_pts:,} pts (scatter auto-switched at >2 000)",
+            xref="paper", yref="paper", x=0.01, y=0.99,
+            showarrow=False, font=dict(size=10, color="#94A3B8"),
+            align="left",
+        )
+    else:
+        # ── Scatter mode (≤ 2000 pts) ─────────────────────────────────────────
+        for lith in liths:
+            mask = sub[color_col] == lith
+            lith_lower = str(lith).lower()
+            fig.add_trace(go.Scatter(
+                x=sub.loc[mask, x_col],
+                y=sub.loc[mask, y_col],
+                mode="markers",
+                name=lith.capitalize(),
+                marker=dict(color=LITHOLOGY_COLORS.get(lith_lower, "#9CA3AF"), size=5, opacity=0.75),
+            ))
 
     fig.update_layout(
         xaxis_title=x_col, yaxis_title=y_col,
         height=400, margin=dict(l=50, r=20, t=30, b=40),
         plot_bgcolor="white", paper_bgcolor="white",
+        legend=dict(itemsizing="constant"),
     )
     if y_col in ["NPHI", "PHI_EFF", "SW"]:
         fig.update_yaxes(autorange="reversed")

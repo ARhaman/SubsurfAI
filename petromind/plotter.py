@@ -86,7 +86,7 @@ def build_log_figure(df: pd.DataFrame, depth_range=None) -> go.Figure:
                 fig.add_shape(
                     type="rect", xref=f"x{lith_col}", yref="y",
                     x0=0, x1=1, y0=prev_d, y1=d,
-                    fillcolor=LITHOLOGY_COLORS.get(prev_lith, "#DDD"),
+                    fillcolor=LITHOLOGY_COLORS.get(str(prev_lith).lower(), "#9CA3AF"),
                     line=dict(width=0), layer="below",
                     row=1, col=lith_col,
                 )
@@ -94,7 +94,7 @@ def build_log_figure(df: pd.DataFrame, depth_range=None) -> go.Figure:
         fig.add_shape(
             type="rect", xref=f"x{lith_col}", yref="y",
             x0=0, x1=1, y0=prev_d, y1=depth[-1],
-            fillcolor=LITHOLOGY_COLORS.get(prev_lith, "#DDD"),
+            fillcolor=LITHOLOGY_COLORS.get(str(prev_lith).lower(), "#9CA3AF"),
             line=dict(width=0), layer="below",
             row=1, col=lith_col,
         )

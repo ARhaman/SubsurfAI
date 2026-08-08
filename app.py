@@ -367,7 +367,7 @@ with tab_xplot:
         st.plotly_chart(build_crossplot(df, x_col, y_col), use_container_width=True)
 
 # ═══════════════════════════════════════════════════════════
-# TAB 4 — MULTI-WELL COMPARISON
+# TAB 4 — MULTI-WELL COMPARISON  (4 view modes)
 # ═══════════════════════════════════════════════════════════
 with tab_multi:
     if len(st.session_state.wells) < 2:
@@ -377,42 +377,283 @@ with tab_multi:
         from plotly.subplots import make_subplots
 
         well_names = list(st.session_state.wells.keys())
-        selected = st.multiselect("Select wells to compare (2–4)", well_names, default=well_names[:min(4,len(well_names))])
-        curve = st.selectbox("Curve to compare", ["GR","RHOB","NPHI","PHI_EFF","SW","VCL"], index=0)
 
-        if len(selected) >= 2:
-            fig_m = make_subplots(rows=1, cols=len(selected), shared_yaxes=True,
-                                  subplot_titles=selected, horizontal_spacing=0.02)
-            COLORS = ["#38BDF8","#22C55E","#F59E0B","#EC4899"]
+        # ── Controls ──────────────────────────────────────────
+        ctrl1, ctrl2, ctrl3 = st.columns([2, 2, 3])
+        curve = ctrl1.selectbox("Curve", ["GR","RHOB","NPHI","RT","PHI_EFF","SW","VCL"], index=0)
+        view_mode = ctrl2.selectbox("View mode", [
+            "📊 Small Multiples",
+            "🔦 Highlight + Context",
+            "📈 Aggregate P10/P50/P90",
+            "🎵 Ridgeline (distributions)",
+        ])
+        # For highlight mode: which well to focus
+        active_well = st.session_state.active_well or well_names[0]
+        if "Highlight" in view_mode:
+            focus_well = ctrl3.selectbox("Focus well", well_names,
+                                          index=well_names.index(active_well) if active_well in well_names else 0)
+        else:
+            selected = ctrl3.multiselect("Wells to include", well_names,
+                                          default=well_names[:min(8, len(well_names))])
+            if not selected:
+                selected = well_names
+
+        ACTIVE_COLOR = "#38BDF8"
+        GREY         = "rgba(160,160,160,0.35)"
+
+        # ── Collect data ──────────────────────────────────────
+        def get_curve(wname, col):
+            wdf = st.session_state.wells[wname]["df"]
+            if col not in wdf.columns:
+                return None, None
+            return wdf["DEPTH"].values, wdf[col].dropna().values
+
+        # ════════════════════════════════════════════════════
+        # MODE 1 — SMALL MULTIPLES
+        # ════════════════════════════════════════════════════
+        if "Small" in view_mode:
+            n = len(selected)
+            cols_n = min(n, 4)
+            rows_n = (n + cols_n - 1) // cols_n
+            fig_m = make_subplots(
+                rows=rows_n, cols=cols_n,
+                shared_yaxes=True, shared_xaxes=True,
+                subplot_titles=[w[:20] for w in selected],
+                horizontal_spacing=0.03,
+                vertical_spacing=0.08,
+            )
+            COLORS = ["#38BDF8","#22C55E","#F59E0B","#EC4899",
+                      "#A78BFA","#FB923C","#F87171","#4ADE80"]
             for i, wname in enumerate(selected):
-                wdf = st.session_state.wells[wname]["df"]
-                if curve in wdf.columns:
+                r, c = i // cols_n + 1, i % cols_n + 1
+                depth, vals = get_curve(wname, curve)
+                if depth is not None and len(vals) > 0:
+                    wdf = st.session_state.wells[wname]["df"]
+                    d   = wdf["DEPTH"].values
+                    v   = wdf[curve].values if curve in wdf.columns else np.full(len(d), np.nan)
                     fig_m.add_trace(go.Scatter(
-                        x=wdf[curve], y=wdf["DEPTH"], mode="lines",
-                        name=wname, line=dict(color=COLORS[i % 4], width=1.2),
-                        showlegend=True,
-                    ), row=1, col=i+1)
-                    fig_m.update_xaxes(title_text=curve, row=1, col=i+1, side="top")
+                        x=v, y=d, mode="lines",
+                        name=wname,
+                        line=dict(color=COLORS[i % len(COLORS)], width=1.0),
+                        showlegend=False,
+                    ), row=r, col=c)
+                fig_m.update_xaxes(title_text=curve, row=r, col=c)
+                fig_m.update_yaxes(autorange="reversed", row=r, col=c)
 
-            fig_m.update_yaxes(autorange="reversed", title_text="Depth (m)", row=1, col=1)
-            fig_m.update_layout(height=650, plot_bgcolor="white", paper_bgcolor="white",
-                                 margin=dict(l=60,r=20,t=60,b=20))
+            fig_m.update_layout(
+                height=320 * rows_n,
+                plot_bgcolor="white", paper_bgcolor="rgba(0,0,0,0)",
+                margin=dict(l=60, r=20, t=60, b=20),
+                title_text=f"Small Multiples — {curve} by well",
+            )
             st.plotly_chart(fig_m, use_container_width=True)
+            st.caption("Each panel = one well · same x and y scale · easy to spot outliers at a glance")
 
-            # Summary stats table
-            rows = []
+        # ════════════════════════════════════════════════════
+        # MODE 2 — HIGHLIGHT + GREY CONTEXT
+        # ════════════════════════════════════════════════════
+        elif "Highlight" in view_mode:
+            fig_h = go.Figure()
+            # Grey background: all other wells
+            for wname in well_names:
+                if wname == focus_well:
+                    continue
+                wdf = st.session_state.wells[wname]["df"]
+                if curve not in wdf.columns:
+                    continue
+                fig_h.add_trace(go.Scatter(
+                    x=wdf[curve].values, y=wdf["DEPTH"].values,
+                    mode="lines", name=wname,
+                    line=dict(color=GREY, width=0.8),
+                    showlegend=False,
+                    hoverinfo="skip",
+                ))
+            # Highlight: focus well in colour
+            wdf_f = st.session_state.wells[focus_well]["df"]
+            if curve in wdf_f.columns:
+                fig_h.add_trace(go.Scatter(
+                    x=wdf_f[curve].values, y=wdf_f["DEPTH"].values,
+                    mode="lines", name=focus_well,
+                    line=dict(color=ACTIVE_COLOR, width=2.5),
+                    showlegend=True,
+                ))
+            fig_h.update_layout(
+                height=650,
+                yaxis=dict(autorange="reversed", title="Depth (m)"),
+                xaxis_title=curve,
+                plot_bgcolor="white", paper_bgcolor="rgba(0,0,0,0)",
+                margin=dict(l=60, r=20, t=50, b=40),
+                title_text=f"{focus_well}  vs.  {len(well_names)-1} other wells (grey)",
+                legend=dict(x=0.01, y=0.01),
+            )
+            st.plotly_chart(fig_h, use_container_width=True)
+            st.caption("Grey = population context · Blue = well you care about · Technique from Andy McDonald, Subsurface Syntax")
+
+        # ════════════════════════════════════════════════════
+        # MODE 3 — AGGREGATE P10 / P50 / P90 BAND
+        # ════════════════════════════════════════════════════
+        elif "Aggregate" in view_mode:
+            # Resample all wells to common depth grid
+            all_depths = np.concatenate([
+                st.session_state.wells[w]["df"]["DEPTH"].values
+                for w in selected if curve in st.session_state.wells[w]["df"].columns
+            ])
+            d_min, d_max = float(np.nanmin(all_depths)), float(np.nanmax(all_depths))
+            depth_grid = np.linspace(d_min, d_max, 500)
+
+            matrix = []
             for wname in selected:
                 wdf = st.session_state.wells[wname]["df"]
-                rows.append({
-                    "Well": wname,
-                    "Depth (m)": f"{wdf['DEPTH'].min():.0f}–{wdf['DEPTH'].max():.0f}",
-                    "Avg GR": f"{wdf['GR'].mean():.1f}" if "GR" in wdf else "—",
-                    "Avg φ_eff": f"{wdf['PHI_EFF'].mean():.3f}" if "PHI_EFF" in wdf else "—",
-                    "Avg Sw": f"{wdf['SW'].mean():.3f}" if "SW" in wdf else "—",
-                    "Net pay (m)": f"{wdf[wdf['FLUID_FLAG']=='hydrocarbon']['DEPTH'].count() * ((wdf['DEPTH'].max()-wdf['DEPTH'].min())/max(len(wdf),1)):.1f}",
-                    "Dom. Lith.": wdf["LITHOLOGY"].mode().iloc[0].capitalize() if "LITHOLOGY" in wdf else "—",
-                })
-            st.dataframe(pd.DataFrame(rows).set_index("Well"), use_container_width=True)
+                if curve not in wdf.columns:
+                    continue
+                v = np.interp(depth_grid, wdf["DEPTH"].values,
+                              wdf[curve].fillna(method="ffill").fillna(method="bfill").values,
+                              left=np.nan, right=np.nan)
+                matrix.append(v)
+
+            if len(matrix) >= 2:
+                M    = np.vstack(matrix)
+                p10  = np.nanpercentile(M, 10,  axis=0)
+                p50  = np.nanpercentile(M, 50,  axis=0)
+                p90  = np.nanpercentile(M, 90,  axis=0)
+
+                fig_a = go.Figure()
+                # P10-P90 shaded band
+                fig_a.add_trace(go.Scatter(
+                    x=np.concatenate([p10, p90[::-1]]),
+                    y=np.concatenate([depth_grid, depth_grid[::-1]]),
+                    fill="toself",
+                    fillcolor="rgba(56,189,248,0.18)",
+                    line=dict(color="rgba(0,0,0,0)"),
+                    name="P10–P90 range",
+                    showlegend=True,
+                ))
+                # P50 median
+                fig_a.add_trace(go.Scatter(
+                    x=p50, y=depth_grid,
+                    mode="lines", name="P50 median",
+                    line=dict(color=ACTIVE_COLOR, width=2.5),
+                ))
+                # Active well overlay
+                wdf_a = st.session_state.wells[active_well]["df"]
+                if curve in wdf_a.columns:
+                    fig_a.add_trace(go.Scatter(
+                        x=wdf_a[curve].values, y=wdf_a["DEPTH"].values,
+                        mode="lines", name=f"{active_well} (active)",
+                        line=dict(color="#F59E0B", width=2.0, dash="dot"),
+                    ))
+
+                fig_a.update_layout(
+                    height=650,
+                    yaxis=dict(autorange="reversed", title="Depth (m)"),
+                    xaxis_title=curve,
+                    plot_bgcolor="white", paper_bgcolor="rgba(0,0,0,0)",
+                    margin=dict(l=60, r=20, t=50, b=40),
+                    title_text=f"Population P10/P50/P90 — {curve} · {len(matrix)} wells",
+                    legend=dict(x=0.01, y=0.99),
+                )
+                st.plotly_chart(fig_a, use_container_width=True)
+                st.caption("Blue band = P10–P90 range of all wells · Solid line = median · Dotted = your active well")
+            else:
+                st.warning("Need at least 2 wells with this curve loaded.")
+
+        # ════════════════════════════════════════════════════
+        # MODE 4 — RIDGELINE (stacked distributions)
+        # ════════════════════════════════════════════════════
+        else:
+            try:
+                from scipy.stats import gaussian_kde
+                ridge_wells = selected[:12]  # max 12 for readability
+                n_ridge = len(ridge_wells)
+
+                # Determine x range from all wells
+                all_vals = np.concatenate([
+                    st.session_state.wells[w]["df"][curve].dropna().values
+                    for w in ridge_wells if curve in st.session_state.wells[w]["df"].columns
+                ])
+                if len(all_vals) < 10:
+                    st.warning("Not enough data for ridgeline.")
+                else:
+                    x_lo, x_hi = np.nanpercentile(all_vals, 1), np.nanpercentile(all_vals, 99)
+                    x_grid = np.linspace(x_lo, x_hi, 300)
+                    overlap = 2.5
+
+                    fig_r = go.Figure()
+                    colors_r = [
+                        "#38BDF8","#34D399","#F59E0B","#A78BFA",
+                        "#FB923C","#F87171","#4ADE80","#E879F9",
+                        "#FCD34D","#60A5FA","#F97316","#EC4899",
+                    ]
+
+                    for i, wname in enumerate(reversed(ridge_wells)):
+                        wdf_r = st.session_state.wells[wname]["df"]
+                        if curve not in wdf_r.columns:
+                            continue
+                        vals = wdf_r[curve].dropna().values
+                        if len(vals) < 20:
+                            continue
+                        try:
+                            kde  = gaussian_kde(vals, bw_method=0.3)
+                            dens = kde(x_grid)
+                            dens = dens / dens.max()  # normalise to [0,1]
+                        except Exception:
+                            continue
+
+                        base  = i * (1.0 / overlap)
+                        color = colors_r[i % len(colors_r)]
+                        is_active = wname == active_well
+
+                        # Fill area
+                        fig_r.add_trace(go.Scatter(
+                            x=np.concatenate([x_grid, x_grid[::-1]]),
+                            y=np.concatenate([base + dens, np.full(len(x_grid), base)]),
+                            fill="toself",
+                            fillcolor=color.replace("#", "rgba(") + ",0.75)" if "#" not in color else color,
+                            line=dict(color="white", width=0.8),
+                            name=wname,
+                            showlegend=True,
+                            hovertemplate=f"<b>{wname}</b><br>{curve}: %{{x:.2f}}<extra></extra>",
+                        ))
+                        # Active well gets a thicker border
+                        if is_active:
+                            fig_r.add_trace(go.Scatter(
+                                x=x_grid, y=base + dens,
+                                mode="lines",
+                                line=dict(color="white", width=2.0),
+                                showlegend=False, hoverinfo="skip",
+                            ))
+
+                    fig_r.update_layout(
+                        height=max(400, 50 * n_ridge),
+                        xaxis_title=curve,
+                        yaxis=dict(showticklabels=False, showgrid=False, zeroline=False),
+                        plot_bgcolor="rgba(15,23,42,1)",
+                        paper_bgcolor="rgba(0,0,0,0)",
+                        margin=dict(l=40, r=20, t=50, b=40),
+                        title_text=f"Ridgeline — {curve} distribution per well",
+                        legend=dict(font=dict(size=9), x=1.01, y=1),
+                        showlegend=True,
+                    )
+                    st.plotly_chart(fig_r, use_container_width=True)
+                    st.caption("Each ridge = one well's distribution · Peaks show the most common value · Width shows spread · Technique: Andy McDonald, Subsurface Syntax")
+            except ImportError:
+                st.error("scipy required for ridgeline plot.")
+
+        # ── Summary stats table (all modes) ──────────────────
+        st.divider()
+        stat_wells = well_names if "Highlight" in view_mode else selected
+        rows_stat = []
+        for wname in stat_wells:
+            wdf = st.session_state.wells[wname]["df"]
+            rows_stat.append({
+                "Well": wname,
+                "Depth (m)": f"{wdf['DEPTH'].min():.0f}–{wdf['DEPTH'].max():.0f}",
+                "Avg GR":    f"{wdf['GR'].mean():.1f}"    if "GR"      in wdf.columns else "—",
+                "Avg φ_eff": f"{wdf['PHI_EFF'].mean():.3f}" if "PHI_EFF" in wdf.columns else "—",
+                "Avg Sw":    f"{wdf['SW'].mean():.3f}"    if "SW"      in wdf.columns else "—",
+                "Dom. Lith.": wdf["LITHOLOGY"].mode().iloc[0].capitalize() if "LITHOLOGY" in wdf.columns else "—",
+            })
+        st.dataframe(pd.DataFrame(rows_stat).set_index("Well"), use_container_width=True)
 
 # ═══════════════════════════════════════════════════════════
 # TAB 5 — ZONE SUMMARY
